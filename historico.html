@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8" />
+    <title>HISTÓRICO DE EXPEDIÇÃO</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css" />
+
+    <style>
+        :root { 
+            --red: #004080;        
+            --dark-red: #002d5a;   
+            --user-bar-bg: #0056b3;
+            --bg: #f0f4f8;         
+        }
+        body { background: var(--bg); font-family: 'Segoe UI', sans-serif; margin: 0; padding: 10px; }
+        
+        #userBar { background: var(--user-bar-bg); padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; border-radius: 6px; color: white; margin-bottom: 10px; }
+        .back-area { display: flex; align-items: center; gap: 15px; }
+        .back-arrow { cursor: pointer; font-size: 24px; text-decoration: none; color: white; }
+        
+        h1 { background: var(--red); color: white; text-align: center; padding: 15px; border-radius: 4px; margin: 0 0 20px 0; font-size: 20px; text-transform: uppercase; }
+
+        .dashboard { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; text-align: center; }
+        
+        #totalVisual { 
+            font-size: 18px; color: var(--red); 
+            margin: 0 auto; border: 2px solid var(--red); 
+            padding: 15px 25px; border-radius: 12px; background: #fff; 
+            display: inline-block; min-width: 300px;
+        }
+
+        .toolbar { display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 15px; align-items: center; }
+        #mainSearch { padding: 10px; border: 1px solid #ccc; border-radius: 6px; width: 220px; outline: none; }
+        
+        .btn-share { background: #1E90FF; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .dropdown { position: relative; display: inline-block; }
+        .dropdown-content { 
+            display: none; position: absolute; right: 0; background-color: #ffffff; 
+            min-width: 200px; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); 
+            z-index: 1000; border-radius: 6px; border: 1px solid #ddd;
+        }
+        .dropdown-content.show { display: block; }
+        .dropdown-content button { 
+            color: #333; padding: 12px 16px; text-decoration: none; display: block; 
+            width: 100%; border: none; background: none; text-align: left; cursor: pointer; border-bottom: 1px solid #eee;
+        }
+
+        .table-container { background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); overflow-x: auto; }
+        
+        table.dataTable { width: 100% !important; border-collapse: collapse !important; margin-top: 0 !important; }
+        
+        table.dataTable thead th { 
+            background: var(--red) !important; 
+            color: white !important; 
+            text-align: center !important; 
+            padding: 10px 18px 10px 5px !important; 
+            border: 1px solid var(--dark-red) !important; 
+            font-size: 12px;
+            text-transform: uppercase;
+            position: relative;
+            cursor: pointer;
+        }
+
+        table.dataTable thead .sorting:after,
+        table.dataTable thead .sorting_asc:after,
+        table.dataTable thead .sorting_desc:after {
+            right: 2px !important;
+            content: "↕" !important;
+            opacity: 0.8 !important;
+            font-size: 14px !important;
+        }
+        table.dataTable thead .sorting_asc:after { content: "↑" !important; opacity: 1 !important; }
+        table.dataTable thead .sorting_desc:after { content: "↓" !important; opacity: 1 !important; }
+        table.dataTable thead .sorting:before, 
+        table.dataTable thead .sorting_asc:before, 
+        table.dataTable thead .sorting_desc:before { content: "" !important; }
+
+        table.dataTable tbody td { border: 1px solid #dee2e6 !important; text-align: center !important; padding: 8px !important; font-size: 13px; }
+        
+        .col-hidden { display: none !important; }
+
+        .filter-btn { 
+            width: 95%; 
+            margin: 4px auto 0; 
+            padding: 4px 0; 
+            font-size: 10px; 
+            background: rgba(255,255,255,0.2); 
+            color: white; 
+            border: 1px solid rgba(255,255,255,0.4); 
+            border-radius: 3px; 
+            cursor: pointer; 
+            font-weight: bold;
+            display: block;
+        }
+        .filter-applied { background: #FFD700 !important; color: #000 !important; border: 1px solid #B8860B !important; }
+        
+        .item-disabled { color: #999; opacity: 0.6; background: #f9f9f9; }
+        .pill { padding: 5px 12px; border-radius: 15px; font-size: 11px; font-weight: bold; display: inline-block; min-width: 95px; text-transform: uppercase; color: #fff; }
+
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; display: none; justify-content: center; align-items: center; }
+        .modal-content { background: white; width: 320px; border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; }
+        .modal-header { background: var(--red); color: white; padding: 15px; font-weight: bold; text-align: center; }
+        .modal-footer { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 15px; background: #f1f1f1; }
+    </style>
+</head>
+<body>
+
+<div id="userBar">
+    <div class="back-area"><a href="index.html" class="back-arrow">←</a> <span id="userName">Usuário</span></div>
+    <button onclick="fazerLogoff()" style="background:transparent; color:white; border:1px solid #fff; padding:6px 15px; border-radius:4px; cursor:pointer; font-weight:bold;">SAIR</button>
+</div>
+
+<h1>HISTÓRICO DE EXPEDIÇÃO</h1>
+
+<div class="dashboard">
+    <div id="totalVisual">Calculando dados resumidos...</div>
+</div>
+
+<div class="toolbar">
+    <input type="text" id="mainSearch" placeholder="🔍 Buscar na tabela...">
+    <a href="dashboard_avarias.html" style="text-decoration: none;">
+        <button type="button" style="background: #ff6600; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-weight: bold;">⚠️ DASHBOARD AVARIAS</button>
+    </a>
+    <div class="dropdown">
+        <button class="btn-share" id="btnShare">COMPARTILHAR ▼</button>
+        <div class="dropdown-content" id="dropContent">
+            <button onclick="exportarPDF()">📄 PDF Profissional (MS)</button>
+            <button onclick="exportarExcel()">📊 Planilha Excel</button>
+        </div>
+    </div>
+</div>
+
+<div class="table-container">
+    <table id="tabelaExp" class="display nowrap">
+        <thead>
+            <tr id="headerRow"></tr>
+            </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<div id="modalFiltro" class="modal-overlay">
+    <div class="modal-content">
+        <div class="modal-header" id="modalTitle">FILTRAR COLUNA</div>
+        <div class="modal-body" id="listCheckboxes" style="max-height: 300px; overflow-y: auto; padding: 10px;"></div>
+        <div class="modal-footer">
+            <button onclick="limparFiltroColuna()">LIMPAR</button>
+            <button onclick="$('#modalFiltro').hide()">FECHAR</button>
+            <button onclick="toggleChecks(true)">TODOS</button>
+            <button onclick="toggleChecks(false)">NENHUM</button>              
+            <button class="btn-aplicar" onclick="aplicarFiltro()" style="grid-column: span 2; background: var(--red); color: white; border: none; padding: 10px; border-radius: 5px; font-weight: bold;">APLICAR</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const csvUrl = "https://docs.google.com/spreadsheets/d/1-t9-DE1erEwcgZWVHMHq5JWBqWYAnZvh-_01__3fHno/export?format=csv&gid=804780494";
+const colunas = ["QTD", "DATA", "EXPEDIÇÃO", "PLACA", "CENTRAL", "DESTINO", "BOX", "STATUS", "CONFERENTE", "VEICULO", "PESO", "CARREGAMENTO"];
+const coresStatus = { "EM SEPARAÇÃO": "#FF8C00", "CARREGADO": "#0055b3", "FINALIZADO": "#0b6631", "CANCELADA": "#b30000" };
+const coresVeic = { "CARRETA": "#006633", "TRUCK": "#4682B4", "CARRO 3/4": "#6A5ACD", "3/4": "#6A5ACD", "PEQUENO": "#6A5ACD", "TOCO": "#8B4513", "RETIRADA": "#DC143C" };
+
+let table, curIdx;
+
+$(document).ready(function() {
+    $("#userName").text("Bem-vindo, " + (localStorage.getItem("username") || "Operador"));
+    Papa.parse(csvUrl, { download: true, header: true, skipEmptyLines: true, complete: res => inicializarPagina(res.data) });
+    $("#btnShare").click(e => { e.stopPropagation(); $("#dropContent").toggleClass("show"); });
+    $(document).click(() => $("#dropContent").removeClass("show"));
+});
+
+function inicializarPagina(dados) {
+    const h = $("#headerRow").empty();
+    colunas.forEach((c, i) => {
+        h.append(`
+            <th class="${i===0?'col-hidden':''}">
+                <div>${c}</div>
+                <button class="filter-btn" id="fbtn-${i}" onclick="event.stopPropagation(); openModal(${i},'${c}')">FILTRAR</button>
+            </th>
+        `);
+    });
+
+    const body = $("#tabelaExp tbody").empty();
+    dados.forEach(r => {
+        let st = (r.STATUS || "").toUpperCase().trim();
+        let vc = (r.VEICULO || "").toUpperCase().trim();
+        let q = r.QTD || "";
+        if(!st && !r.DATA) return;
+
+        let placa = r.PLACA || "";
+        let placaHtml = placa.includes("*") ? `<span style="color:red; font-weight:bold;">${placa.replace(/\*/g, "")}</span>` : placa;
+
+        body.append(`<tr>
+            <td class="col-hidden">${q}</td>
+            <td>${r.DATA || ""}</td>
+            <td>${r["EXPEDIÇÃO"] || r.EXPEDICAO || ""}</td>
+            <td>${placaHtml}</td> 
+            <td>${r.CENTRAL || ""}</td>
+            <td>${r.DESTINO || ""}</td>
+            <td>${r.BOX || ""}</td>
+            <td><span class="pill" style="background:${coresStatus[st] || '#ccc'}">${st}</span></td>
+            <td>${r.CONFERENTE || ""}</td>            
+            <td><span class="pill" style="background:${coresVeic[vc] || '#eee'}; border:1px solid #ccc">${vc}</span></td>
+            <td>${r.PESO || ""}</td>
+            <td>${r.CARREGAMENTO || ""}</td>            
+        </tr>`);
+    });
+
+    table = $('#tabelaExp').DataTable({ 
+        paging: false, 
+        info: false, 
+        dom: 'rt', 
+        scrollX: true, 
+        destroy: true, 
+        ordering: true,
+        columnDefs: [{ targets: '_all', orderSequence: ['desc', 'asc'] }]
+    });
+
+    $('#mainSearch').on('keyup', function() { table.search(this.value).draw(); updateDashboard(); });
+    restaurarFiltrosPermanentes();
+    updateDashboard();
+}
+
+function updateDashboard() {
+    const visibleRows = table.rows({ search: 'applied' }).nodes().to$();
+    const chavesUnicasCargas = new Set(); 
+    let comps = 0, exped = 0;
+    const vStat = {};
+
+    visibleRows.each(function() {
+        exped++;
+        let q = $(this).find('td:eq(0)').text().trim(); // QTD (Identificador da Carga)
+        let data = $(this).find('td:eq(1)').text().trim(); // DATA
+        let vc = $(this).find('td:eq(9)').text().trim(); // VEICULO
+        
+        if (q !== "" && !isNaN(q)) {
+            if (q.includes("-")) {
+                comps++;
+            } else {
+                // Cria uma chave composta: DATA + IDENTIFICADOR
+                // Assim, "25/02_1" é diferente de "26/02_1"
+                const chaveCarga = `${data}_${q}`;
+                if(!chavesUnicasCargas.has(chaveCarga)) { 
+                    chavesUnicasCargas.add(chaveCarga); 
+                    if(vc) vStat[vc] = (vStat[vc] || 0) + 1;
+                }
+            }
+        }
+    });
+
+    let resumoVeiculos = Object.keys(vStat)
+        .map(tipo => `<strong>${tipo}:</strong> ${vStat[tipo]}`)
+        .join(' | ');
+
+    $("#totalVisual").html(`
+        <div style="margin-bottom:8px;">
+            <strong>CARGAS:</strong> ${chavesUnicasCargas.size} ${comps > 0 ? '(+ ' + comps + ' Comp.)' : ''} | 
+            <strong>EXPEDIÇÕES:</strong> ${exped}
+        </div>
+        <div style="font-size: 14px; color: #555; border-top: 1px solid #eee; pt-5px; margin-top:5px;">
+            ${resumoVeiculos || 'Sem veículos registrados'}
+        </div>
+    `);
+
+    colunas.forEach((_, i) => {
+        let mem = localStorage.getItem(`hist_filt_${i}`);
+        $(`#fbtn-${i}`).toggleClass("filter-applied", !!(mem && JSON.parse(mem).length > 0)).text(mem && JSON.parse(mem).length > 0 ? "ATIVO" : "FILTRAR");
+    });
+}
+
+function openModal(idx, title) {
+    curIdx = idx; 
+    $("#modalTitle").text(title);
+    const allUnique = table.column(idx, { filter: 'none' }).data().unique().sort().toArray().map(v => v.replace(/<[^>]*>/g, "").trim()).filter(v => v !== "");
+    const currentViewUnique = table.column(idx, { filter: 'applied' }).data().unique().toArray().map(v => v.replace(/<[^>]*>/g, "").trim());
+    const list = $("#listCheckboxes").empty();
+    const salvos = JSON.parse(localStorage.getItem(`hist_filt_${idx}`)) || [];
+
+    let disponiveis = allUnique.filter(v => currentViewUnique.includes(v));
+    let indisponiveis = allUnique.filter(v => !currentViewUnique.includes(v));
+
+    const criarItem = (v, isDisabled) => {
+        const isChecked = salvos.length === 0 || salvos.includes(v);
+        const classDisabled = isDisabled ? 'item-disabled' : '';
+        list.append(`
+            <label class="${classDisabled}" style="display:block; padding:8px; border-bottom:1px solid #eee; cursor:pointer;">
+                <input type="checkbox" value="${v}" ${isChecked ? "checked" : ""}> ${v}
+            </label>`);
+    };
+
+    disponiveis.forEach(v => criarItem(v, false));
+    if(indisponiveis.length > 0) {
+        list.append(`<div style="background:#f4f4f4; padding:5px; font-size:10px; font-weight:bold; text-align:center; color:#666;">INDISPONÍVEIS NO FILTRO ATUAL</div>`);
+        indisponiveis.forEach(v => criarItem(v, true));
+    }
+    $("#modalFiltro").css("display", "flex");
+}
+
+function aplicarFiltro() {
+    const sel = $("#listCheckboxes input:checked").map(function(){ return this.value; }).get();
+    const totalItens = $("#listCheckboxes input").length;
+    if(sel.length === totalItens) {
+        limparFiltroColuna();
+    } else {
+        table.column(curIdx).search(sel.length ? sel.map(v => '^' + $.fn.dataTable.util.escapeRegex(v) + '$').join('|') : 'NONE_SELECTED', true, false).draw();
+        localStorage.setItem(`hist_filt_${curIdx}`, JSON.stringify(sel));
+        $("#modalFiltro").hide(); 
+        updateDashboard();
+    }
+}
+
+function limparFiltroColuna() { 
+    localStorage.removeItem(`hist_filt_${curIdx}`); 
+    table.column(curIdx).search('').draw(); 
+    $("#modalFiltro").hide(); 
+    updateDashboard(); 
+}
+
+function restaurarFiltrosPermanentes() { 
+    colunas.forEach((_, i) => { 
+        let m = JSON.parse(localStorage.getItem(`hist_filt_${i}`)); 
+        if(m && m.length > 0) table.column(i).search(m.map(v => '^'+$.fn.dataTable.util.escapeRegex(v)+'$').join('|'), true, false); 
+    }); 
+    table.draw(); 
+}
+
+function exportarPDF() {
+    const { jsPDF } = window.jspdf; const doc = new jsPDF('l', 'mm', 'a4');
+    const rows = table.rows({ search: 'applied' }).nodes().to$();
+    doc.setFillColor(0, 64, 128); doc.rect(0, 0, 297, 25, 'F');
+    doc.setTextColor(255, 255, 255); doc.setFontSize(28); doc.text("MS", 15, 17);
+    doc.setFontSize(16); doc.text("EXPEDIÇÃO_MÓVEIS SIMONETTI", 45, 15);
+    const chavesPDF = new Set(); let te = 0; const resVeic = {};
+    rows.each(function() {
+        te++; 
+        let q = $(this).find('td:eq(0)').text().trim();
+        let d = $(this).find('td:eq(1)').text().trim();
+        let v = $(this).find('td:eq(9)').text().trim();
+        if(!q.includes("-") && q !== "" && !isNaN(q)) { 
+            const chave = `${d}_${q}`;
+            if(!chavesPDF.has(chave)){ 
+                chavesPDF.add(chave); 
+                resVeic[v] = (resVeic[v] || 0) + 1; 
+            } 
+        }
+    });
+    doc.setFontSize(10); doc.text(`CARGAS: ${chavesPDF.size} | TOTAL EXPEDIÇÕES: ${te}`, 215, 15);
+    const body = [];
+    rows.each(function() { let r = []; $(this).find('td').each((i, td) => { if(i>0) r.push($(td).text().trim()); }); body.push(r); });
+    doc.autoTable({
+        startY: 35, head: [colunas.slice(1)], body: body,
+        styles: { fontSize: 7, halign: 'center' },
+        headStyles: { fillColor: [0, 64, 128] },
+        didParseCell: (data) => {
+            if(data.section === 'body') {
+                if(data.column.index === 2) {
+                    const original = table.cell(data.row.index, 3).node().innerHTML;
+                    if(original.includes('color:red')) data.cell.styles.textColor = [255, 0, 0];
+                }
+                if(data.column.index === 6) { let c = coresStatus[data.cell.raw.toUpperCase()]; if(c) data.cell.styles.textColor = hexToRgb(c); }
+                if(data.column.index === 8) { let c = coresVeic[data.cell.raw.toUpperCase()]; if(c) data.cell.styles.textColor = hexToRgb(c); }
+            }
+        }
+    });
+    let finalY = doc.lastAutoTable.finalY + 10;
+    doc.setTextColor(0, 0, 0); doc.setFontSize(11); doc.text("RESUMO DE VEÍCULOS (POR CARGA):", 15, finalY);
+    let summaryData = Object.keys(resVeic).map(k => [k, resVeic[k]]);
+    doc.autoTable({ startY: finalY + 5, head: [["VEÍCULO", "QUANTIDADE"]], body: summaryData, tableWidth: 80, styles: { fontSize: 9, halign: 'center' }, headStyles: { fillColor: [80, 80, 80] } });
+    doc.save("Histórico_Expedicao_MS.pdf");
+}
+
+function hexToRgb(hex) { let r = parseInt(hex.slice(1,3), 16), g = parseInt(hex.slice(3,5), 16), b = parseInt(hex.slice(5,7), 16); return [r, g, b]; }
+
+function exportarExcel() {
+    const rows = table.rows({ search: 'applied' }).data().toArray();
+    const dadosParaExportar = [colunas]; 
+
+    rows.forEach(row => {
+        let linhaLimpa = row.map(cell => {
+            if (typeof cell === 'string') {
+                return cell.replace(/<[^>]*>/g, "").trim();
+            }
+            return cell;
+        });
+        dadosParaExportar.push(linhaLimpa);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(dadosParaExportar);
+    Object.keys(ws).forEach(cell => {
+        if(cell[0] === '!') return;
+        ws[cell].t = 's'; 
+    });
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Histórico");
+    XLSX.writeFile(wb, "Historico_Expedicao_MS.xlsx");
+}
+function toggleChecks(b) { $("#listCheckboxes input").prop("checked", b); }
+function fazerLogoff() { localStorage.clear(); window.location.href = "login.html"; }
+</script>
+</body>
+</html>
